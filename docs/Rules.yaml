@@ -1,0 +1,32 @@
+---
+check-requirements:
+- name: Category 1
+  file-requirements:
+    - name: req1
+      description: Description for req1
+      kind: PDF
+    - name: req2
+      description: Description for req2
+      kind: Drawing
+  rules:
+    - name: rule1
+      description: Description for rule1
+      skill: SKILL1.md
+      gate: GATE1.md
+      
+- name: Category 2
+  file-requirements:
+    - name: req3
+      description: Description for req3
+      kind: PDF
+    - name: req4
+      description: Description for req4
+      kind: Drawing
+  rules:
+    - name: rule2
+      description: Description for rule2
+      skill: SKILL2.md
+      gate: GATE2.md
+
+output-template:
+  - file: output.template.xlsx
