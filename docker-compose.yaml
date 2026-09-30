@@ -1,0 +1,84 @@
+name: dyano-checker
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      # Activate the mounted, patched settings module.
+      DJANGO_SETTINGS_MODULE: config.settings_local
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required. Run scripts/generate-secret.sh}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DB_PATH: ${DB_PATH:-/app/data/db.sqlite3}
+    volumes:
+      - db_data:/app/data
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+      # Mount the external settings file. Point SETTINGS_LOCAL at your own copy
+      # (e.g. export SETTINGS_LOCAL=/path/to/settings_local.py) to override.
+      - ${SETTINGS_LOCAL:-./deploy/settings_local.py}:/app/backend/config/settings_local.py:ro
+    command: ["uvicorn", "config.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings_local
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required. Run scripts/generate-secret.sh}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DB_PATH: ${DB_PATH:-/app/data/db.sqlite3}
+      # Migrations run in the backend service; the worker only consumes.
+      SKIP_MIGRATE: "1"
+    volumes:
+      - db_data:/app/data
+      - media_data:/app/media
+      - ${SETTINGS_LOCAL:-./deploy/settings_local.py}:/app/backend/config/settings_local.py:ro
+    command: ["python", "manage.py", "runworker"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    volumes:
+      - media_data:/app/media:ro
+      - static_data:/app/staticfiles:ro
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  db_data:
+  media_data:
+  static_data:

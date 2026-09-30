@@ -1,0 +1,21 @@
+# Git / VCS
+.git
+.gitignore
+
+# Python
+.venv
+__pycache__
+*.py[cod]
+*.egg-info
+
+# Django runtime data (kept out of the image)
+backend/db.sqlite3
+media/
+staticfiles/
+
+# Node / frontend build artifacts
+web/node_modules
+web/dist
+
+# Secrets / local env
+.env

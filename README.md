@@ -105,6 +105,66 @@ input uses `accept=".pdf,application/pdf"`.
   `redis://:password@localhost:6380/0`
 - Media files are stored under `media/` (`MEDIA_ROOT`)
 
+## Deploying with Docker
+
+The repo ships Docker images for the backend and frontend plus a
+`docker-compose.yaml` that runs the full stack: Redis (broker), the API server
+(uvicorn), the FastStream worker, and nginx (serving the built frontend and
+proxying `/api`, `/admin`, `/media`, `/static` to the backend).
+
+### 1. Generate a secret key
+
+```bash
+./scripts/generate-secret.sh
+```
+
+This writes `DJANGO_SECRET_KEY` into `.env` (the file is gitignored). Fill in
+the remaining variables from `.env.example` as needed (e.g. `DJANGO_DEBUG`,
+`DJANGO_ALLOWED_HOSTS`, `REDIS_URL`).
+
+### 2. Custom settings (optional)
+
+The containers are started with `DJANGO_SETTINGS_MODULE=config.settings_local`.
+`settings_local.py` is not baked into the image — it is mounted in via a
+volume, so you can patch it without rebuilding:
+
+```bash
+# use your own patched settings file
+export SETTINGS_LOCAL=/path/to/my_settings_local.py
+```
+
+The provided template is [`deploy/settings_local.py`](deploy/settings_local.py)
+and reads all values from environment variables (see `.env.example`).
+
+### 3. Build and start
+
+```bash
+docker compose up -d --build
+```
+
+Then create the initial admin user:
+
+```bash
+docker compose run --rm backend python manage.py createsuperuser
+```
+
+### 4. What runs where
+
+| Service   | Role                                | Port |
+| --------- | ----------------------------------- | ---- |
+| `web`     | nginx: frontend + reverse proxy     | 8080 |
+| `backend` | uvicorn (Django API / admin)        | 8000 |
+| `worker`  | FastStream Redis worker             | —    |
+| `redis`   | broker                              | —    |
+
+- Frontend: http://localhost:8080
+- Swagger: http://localhost:8000/api/docs
+- Django admin: http://localhost:8000/admin (or via http://localhost:8080/admin)
+
+Data is persisted in Docker named volumes (`db_data`, `media_data`,
+`static_data`). To stop: `docker compose down` (add `-v` to also delete the
+volumes).
+
 ## License
 
 [Apache License 2.0](LICENSE)

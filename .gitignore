@@ -16,3 +16,6 @@ media/
 # Node / frontend
 web/node_modules/
 web/dist/
+
+# Local environment / secrets
+.env
