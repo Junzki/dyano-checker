@@ -32,8 +32,8 @@ by a FastStream/Redis worker.
   - `src/dyano_agent/` — `main.py`, `config.py`, `pdf_reader.py`,
     `sanitizer.py`, `checker.py`, `schemas.py`, `report.py`
   - `Dockerfile` — `python:3.12-slim`; deps resolved at build (no committed lock)
-- `skills/` — default `SKILL*.md` / `GATE*.md` / `output.template.xlsx`,
-  fallback for rule sets without uploaded `RuleSkillFile`s.
+- `skills/` — reserved for a built-in skill; user-defined skills are defined
+  inline in `docs/Rules.yaml` or uploaded per rule set (`RuleSkillFile`).
 - `web/` — React frontend (`src/api.ts`, `src/App.tsx`, `src/components/*`)
 
 ## Commands

@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `output_url` on `GET /api/submissions/{id}` and a download link in the web UI
   for the generated result spreadsheet.
 
+### Changed
+
+- Rule skills/gates are now user-defined and travel with the rule set: they can
+  be defined inline in the YAML (multi-line content) or uploaded per rule set
+  (`RuleSkillFile`) and referenced by filename. The repo-level `skills/`
+  fallback directory and bundled example files were removed.
+
 ## [0.1.0] - 2026-10-01
 
 ### Added

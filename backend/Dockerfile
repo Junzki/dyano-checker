@@ -22,10 +22,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy application source.
 COPY backend ./backend
 
-# Repo-level skill/gate/template defaults (fallback when a rule set has no
-# uploaded skill files).
-COPY skills ./skills
-
 # docker CLI so the worker can spawn the checking agent container.
 COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/docker
 

@@ -19,7 +19,7 @@ agent container.
 ## Architecture
 
 ```
-admin (Django admin)  ──uploads YAML + skills──▶  RuleSet (name + parsed schema)
+admin (Django admin)  ──uploads YAML (+ skill files)──▶  RuleSet (name + parsed schema)
                                                       │
 user (React form)  ──chooses RuleSet──▶  renders file inputs from schema
                                                       │
@@ -43,7 +43,6 @@ dyano-checker/
 ├── pyproject.toml          # uv project manifest (backend deps, no package build)
 ├── .python-version         # 3.14
 ├── docs/Rules.yaml         # example rule-set YAML
-├── skills/                 # default skill/gate/output-template files
 ├── media/                  # MEDIA_ROOT (gitignored)
 ├── agent/                  # checking agent (Pydantic AI, own Docker image)
 │   ├── pyproject.toml      # agent deps (Python 3.12)
@@ -105,9 +104,9 @@ an optional `output-template`. The form is driven by `file-requirements`
 input uses `accept=".pdf,application/pdf"`.
 
 Each `rule` references a `skill` (checking instructions, becomes the agent
-system prompt) and a `gate` (pass/fail criteria). These files are uploaded per
-rule set in Django admin (`RuleSkillFile`) or fall back to the repo
-[`skills/`](skills/) directory.
+system prompt) and a `gate` (pass/fail criteria). The skill and gate can be
+defined inline in the YAML (multi-line content) or uploaded alongside the rule
+set in Django admin (`RuleSkillFile`) and referenced by filename.
 
 ## Checking agent
 

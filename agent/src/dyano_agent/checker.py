@@ -1,9 +1,9 @@
 """Tool 3 — Checker.
 
 Run each rule from the rule-set YAML, one by one, against the sanitized
-extracted documents. Each rule's `skill` file becomes the agent system prompt
-and its `gate` file the pass/fail criteria. Backed by Pydantic AI with an
-OpenAI-compatible model.
+extracted documents. Each rule's `skill` (inline content or a referenced file)
+becomes the agent system prompt and its `gate` the pass/fail criteria. Backed
+by Pydantic AI with an OpenAI-compatible model.
 """
 
 from __future__ import annotations
@@ -17,22 +17,30 @@ from .schemas import CheckResult, Rule
 logger = logging.getLogger(__name__)
 
 
+def _resolve_skill_value(config: Config, value: str, kind: str) -> str:
+    """Resolve a rule's `skill`/`gate` value.
+
+    The YAML may hold either the skill content inline or a filename reference to
+    a file uploaded alongside the rule set (available under ``skills_dir``).
+    Multi-line values are always inline content; single-line values are treated
+    as a filename when a matching file exists, otherwise used inline.
+    """
+    if not value:
+        return ""
+    if "\n" in value:
+        return value
+    path = config.skills_dir / value
+    if path.is_file():
+        return path.read_text(encoding="utf-8")
+    logger.warning("%s file '%s' not found; using value as inline content", kind, value)
+    return value
+
+
 def _load_skill_gate(config: Config, rule: Rule) -> tuple[str, str]:
-    skill = ""
-    gate = ""
-    if rule.skill:
-        skill_path = config.skills_dir / rule.skill
-        if skill_path.exists():
-            skill = skill_path.read_text(encoding="utf-8")
-        else:
-            logger.warning("Skill file %s not found", skill_path)
-    if rule.gate:
-        gate_path = config.skills_dir / rule.gate
-        if gate_path.exists():
-            gate = gate_path.read_text(encoding="utf-8")
-        else:
-            logger.warning("Gate file %s not found", gate_path)
-    return skill, gate
+    return (
+        _resolve_skill_value(config, rule.skill, "Skill"),
+        _resolve_skill_value(config, rule.gate, "Gate"),
+    )
 
 
 def _build_documents(sanitized_dir: Path) -> str:

@@ -30,8 +30,9 @@ class RuleSkillFile(models.Model):
     """A skill/gate/template file uploaded for a specific rule set.
 
     The rule-set YAML references these files by name (``skill: SKILL1.md``,
-    ``gate: GATE1.md``). When a checking task runs, the worker mounts the
-    uploaded files into the agent container.
+    ``gate: GATE1.md``). Skills/gates can alternatively be defined inline in
+    the YAML, in which case no upload is needed. When a checking task runs, the
+    worker mounts the uploaded files into the agent container.
     """
 
     rule_set = models.ForeignKey(

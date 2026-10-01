@@ -11,9 +11,14 @@ check-requirements:
   rules:
     - name: rule1
       description: Description for rule1
-      skill: SKILL1.md
-      gate: GATE1.md
-      
+      # A skill/gate can be defined inline in the YAML (multi-line content) ...
+      skill: |
+        You are a document checker. Review the provided documents carefully,
+        quote exact evidence, and return a single verdict: pass, fail, or error.
+      gate: |
+        PASS: the requested information is present and legible.
+        FAIL: the requested information is missing, illegible, or contradictory.
+
 - name: Category 2
   file-requirements:
     - name: req3
@@ -25,8 +30,10 @@ check-requirements:
   rules:
     - name: rule2
       description: Description for rule2
+      # ... or reference a file uploaded alongside the rule set by name.
       skill: SKILL2.md
       gate: GATE2.md
 
+# The output template is a separate file uploaded with the rule set.
 output-template:
   - file: output.template.xlsx

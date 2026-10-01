@@ -9,14 +9,12 @@ from django.conf import settings
 
 from .models import Submission
 
-DEFAULT_OUTPUT_TEMPLATE = "output.template.xlsx"
-
 
 def _agent_root(submission: Submission) -> Path:
     return Path(settings.MEDIA_ROOT) / "agent" / str(submission.pk)
 
 
-def _output_template_name(submission: Submission) -> str:
+def _output_template_name(submission: Submission) -> str | None:
     """Return the template filename referenced by the YAML `output-template`."""
     rules_path = Path(submission.rule_set.yaml_file.path)
     data = yaml.safe_load(rules_path.read_text(encoding="utf-8")) or {}
@@ -24,7 +22,7 @@ def _output_template_name(submission: Submission) -> str:
         name = entry.get("file") if isinstance(entry, dict) else entry
         if name:
             return name
-    return DEFAULT_OUTPUT_TEMPLATE
+    return None
 
 
 def _prepare_input(submission: Submission) -> None:
@@ -39,27 +37,22 @@ def _prepare_input(submission: Submission) -> None:
     rules_src = Path(submission.rule_set.yaml_file.path)
     shutil.copyfile(rules_src, input_dir / "rules.yaml")
 
-    # Skills/gates: uploaded RuleSkillFile entries first, repo defaults next.
-    skill_names: set[str] = set()
+    # Skills/gates: files uploaded alongside the rule set (referenced by name in
+    # the YAML). Inline skill/gate content is left in the YAML and resolved by
+    # the agent directly, so only uploaded files are copied here.
     for skill_file in submission.rule_set.skill_files.all():
         shutil.copyfile(
             Path(skill_file.file.path), input_dir / "skills" / skill_file.name
         )
-        skill_names.add(skill_file.name)
 
-    repo_skills = Path(settings.PROJECT_ROOT) / "skills"
-    if repo_skills.is_dir():
-        for path in repo_skills.iterdir():
-            if path.is_file() and path.name not in skill_names:
-                shutil.copyfile(path, input_dir / "skills" / path.name)
-
-    # Output template: the dedicated RuleSet upload overrides the repo default.
+    # Output template: the dedicated RuleSet upload, named as the YAML references it.
     if submission.rule_set.output_template:
         template_name = _output_template_name(submission)
-        shutil.copyfile(
-            Path(submission.rule_set.output_template.path),
-            input_dir / "skills" / template_name,
-        )
+        if template_name:
+            shutil.copyfile(
+                Path(submission.rule_set.output_template.path),
+                input_dir / "skills" / template_name,
+            )
 
     # Files + manifest (file_path is relative to the agent's files dir).
     manifest_files: list[dict] = []

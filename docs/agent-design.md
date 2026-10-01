@@ -41,7 +41,7 @@ volume mounted at `/media`:
 /media/agent/<submission_id>/input   (read-only in spirit)
 ├── manifest.json        # submission_id + file entries
 ├── rules.yaml           # full rule-set YAML (check-requirements, rules, output-template)
-├── skills/              # SKILL*.md / GATE*.md / output template xlsx
+├── skills/              # uploaded skill/gate files + output template xlsx
 └── files/<key>/<name>   # one uploaded file per requirement key
 
 /media/agent/<submission_id>/work    (written by the agent)
@@ -123,9 +123,10 @@ check step consumes only sanitized text.
 ### 3. Check (`checker.py`)
 
 Runs each `rule` from the rule-set YAML, sequentially, in YAML order. Each rule
-references a `skill` (instructions) and a `gate` (pass/fail criteria):
+provides a `skill` (instructions) and a `gate` (pass/fail criteria), either
+inline in the YAML or as an uploaded file referenced by name:
 
-- The `skill` file content becomes the Pydantic AI agent's **system prompt**.
+- The resolved `skill` content becomes the Pydantic AI agent's **system prompt**.
 - The user prompt contains the rule name/description, the sanitized documents,
   and the `gate` criteria.
 - A structured result is requested via `result_type`:
@@ -222,11 +223,12 @@ container lifecycle:
    status (`completed`/`failed`); copy the produced spreadsheet paths into
    `results` and expose the first as `output_url`.
 
-Skills are resolved from per-rule-set `RuleSkillFile` uploads first, falling
-back to the repo `skills/` directory. The output template comes from the
+Skills are user-defined and travel with the rule set: either inline in the YAML
+(multi-line `skill`/`gate` content) or as per-rule-set `RuleSkillFile` uploads
+referenced by filename. The output template comes from the
 `RuleSet.output_template` upload (placed under `skills/` with the name the YAML
-references), falling back to `skills/output.template.xlsx`. The worker image
-therefore ships the `docker` CLI and runs with `/var/run/docker.sock` mounted.
+references). The worker image therefore ships the `docker` CLI and runs with
+`/var/run/docker.sock` mounted.
 
 ## Security considerations
 
