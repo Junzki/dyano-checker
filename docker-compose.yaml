@@ -51,11 +51,18 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       DB_PATH: ${DB_PATH:-/app/data/db.sqlite3}
+      # Checking-agent orchestration.
+      AGENT_IMAGE: ${AGENT_IMAGE:-dyano-checker-agent}
+      AGENT_MEDIA_VOLUME: ${AGENT_MEDIA_VOLUME:-dyano-checker_media_data}
+      AGENT_LLM_BASE_URL: ${AGENT_LLM_BASE_URL:-}
+      AGENT_LLM_API_KEY: ${AGENT_LLM_API_KEY:-}
+      AGENT_LLM_MODEL: ${AGENT_LLM_MODEL:-gpt-4o-mini}
       # Migrations run in the backend service; the worker only consumes.
       SKIP_MIGRATE: "1"
     volumes:
       - db_data:/app/data
       - media_data:/app/media
+      - /var/run/docker.sock:/var/run/docker.sock
       - ${SETTINGS_LOCAL:-./deploy/settings_local.py}:/app/backend/config/settings_local.py:ro
     command: ["python", "manage.py", "runworker"]
     depends_on:
@@ -77,6 +84,16 @@ services:
     depends_on:
       backend:
         condition: service_started
+
+  # One-shot checking agent image. It is not run by `docker compose up`; the
+  # worker spawns `docker run` containers from this image per submission.
+  # Build it with: docker compose build agent
+  agent:
+    image: dyano-checker-agent
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    profiles: ["agent"]
 
 volumes:
   db_data:

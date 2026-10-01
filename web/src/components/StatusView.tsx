@@ -47,6 +47,11 @@ export function StatusView({ submission }: Props) {
               </li>
             ))}
           </ul>
+          {detail.output_url && (
+            <a href={detail.output_url} download>
+              Download result spreadsheet
+            </a>
+          )}
         </>
       )}
       {!detail && !error && <div>Waiting for status…</div>}

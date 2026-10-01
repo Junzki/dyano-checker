@@ -22,6 +22,12 @@ ALLOWED_HOSTS = [
 
 REDIS_URL = os.environ.get("REDIS_URL", REDIS_URL)
 
+AGENT_IMAGE = os.environ.get("AGENT_IMAGE", AGENT_IMAGE)
+AGENT_MEDIA_VOLUME = os.environ.get("AGENT_MEDIA_VOLUME", AGENT_MEDIA_VOLUME)
+AGENT_LLM_BASE_URL = os.environ.get("AGENT_LLM_BASE_URL", AGENT_LLM_BASE_URL)
+AGENT_LLM_API_KEY = os.environ.get("AGENT_LLM_API_KEY", AGENT_LLM_API_KEY)
+AGENT_LLM_MODEL = os.environ.get("AGENT_LLM_MODEL", AGENT_LLM_MODEL)
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",

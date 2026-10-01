@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Checking agent "XLSX writer" tool that fills the rule set's output spreadsheet
+  template with per-rule verdicts (`PASSED`/`FAILED`/`ERROR`).
+- `RuleSet.output_template` FileField so an admin can upload the output template
+  alongside the rule-set YAML; the worker mounts it into the agent container.
+- `output_url` on `GET /api/submissions/{id}` and a download link in the web UI
+  for the generated result spreadsheet.
+
 ## [0.1.0] - 2026-10-01
 
 ### Added

@@ -3,43 +3,56 @@
 YAML-driven dynamic file-upload forms. An admin uploads a YAML file that
 describes a set of *file requirements* (grouped into categories); end users
 then pick the named rule set and get a form that renders one file input per
-requirement. Uploaded files are stored locally and processed by an async
-worker.
+requirement. Uploaded files are stored locally and checked by a per-task LLM
+agent container.
 
 ## Tech stack
 
 - **Backend**: Django + SQLite, [django-ninja](https://django-ninja.dev/) (REST + Swagger)
 - **Async tasks**: [FastStream](https://faststream.airt.ai/) with Redis as broker
-- **Python**: uv-managed, Python 3.14
+- **Checking agent**: [Pydantic AI](https://ai.pydantic.dev/) + PyMuPDF / Docling /
+  PaddleOCR, packaged as a one-shot Docker image (Python 3.12)
+- **Python**: uv-managed, Python 3.14 (backend) / 3.12 (agent)
 - **Frontend**: React + TypeScript + Vite (npm)
 - **Storage**: local filesystem under `media/`
 
 ## Architecture
 
 ```
-admin (Django admin)  ──uploads YAML──▶  RuleSet (name + parsed schema)
-                                              │
+admin (Django admin)  ──uploads YAML + skills──▶  RuleSet (name + parsed schema)
+                                                      │
 user (React form)  ──chooses RuleSet──▶  renders file inputs from schema
-                                              │
+                                                      │
                           ──submit files──▶  Submission (queued)
-                                              │  publish to Redis
+                                                      │  publish to Redis
                                           FastStream worker
-                                              │  queued → processing → completed/failed
-                                          SubmissionFile(s) saved under media/
+                                                      │  queued → processing
+                                                      │  assemble input + manifest
+                                                      │  docker run agent (per task)
+                                                      │  read results.json
+                                          checking agent (one-shot container)
+                                                      │  pdf_reader → sanitizer → check
+                                                      ▼
+                                              completed/failed + results
 ```
 
 ## Directory layout
 
 ```
 dyano-checker/
-├── pyproject.toml          # uv project manifest (deps only, no package build)
+├── pyproject.toml          # uv project manifest (backend deps, no package build)
 ├── .python-version         # 3.14
 ├── docs/Rules.yaml         # example rule-set YAML
+├── skills/                 # default skill/gate/output-template files
 ├── media/                  # MEDIA_ROOT (gitignored)
+├── agent/                  # checking agent (Pydantic AI, own Docker image)
+│   ├── pyproject.toml      # agent deps (Python 3.12)
+│   ├── Dockerfile
+│   └── src/dyano_agent/    # pdf_reader, sanitizer, checker, report
 ├── backend/                # Django project
 │   ├── manage.py
 │   ├── config/             # settings.py, urls.py, asgi.py, wsgi.py
-│   └── checker/            # models, admin, api, schema, broker, worker
+│   └── checker/            # models, admin, api, schema, broker, tasks, worker
 │       └── management/commands/runworker.py
 └── web/                    # React + TS + Vite frontend
     └── src/
@@ -47,9 +60,10 @@ dyano-checker/
 
 ## Prerequisites
 
-- [uv](https://docs.astral.sh/uv/) with Python 3.14
+- [uv](https://docs.astral.sh/uv/) with Python 3.14 (backend) and 3.12 (agent)
 - Node.js + npm
 - Redis
+- Docker (the worker spawns an agent container per submission)
 
 ## Setup
 
@@ -90,6 +104,26 @@ an optional `output-template`. The form is driven by `file-requirements`
 (`name`, `description`, `kind`). Only `PDF` is currently supported, so every
 input uses `accept=".pdf,application/pdf"`.
 
+Each `rule` references a `skill` (checking instructions, becomes the agent
+system prompt) and a `gate` (pass/fail criteria). These files are uploaded per
+rule set in Django admin (`RuleSkillFile`) or fall back to the repo
+[`skills/`](skills/) directory.
+
+## Checking agent
+
+The agent runs once per submission as a disposable container:
+
+1. **PDF reader** — detects native-text vs scanned PDFs; extracts Markdown with
+   PyMuPDF/Docling (native) or PaddleOCR (scanned) into the mounted work dir.
+2. **Sanitizer** — scans extracted text and filenames for prompt-injection and
+   redacts suspicious lines before they reach the model.
+3. **Check** — runs each YAML rule one-by-one with Pydantic AI against the
+   sanitized documents, using the rule's skill as system prompt and gate as
+   criteria.
+
+Results land in `results.json` (plus `report.md`) under the work dir; the
+worker reads them back into `Submission.results`.
+
 ## API
 
 | Method | Path | Description |
@@ -103,6 +137,10 @@ input uses `accept=".pdf,application/pdf"`.
 
 - `REDIS_URL` — broker URL, defaults to
   `redis://:password@localhost:6380/0`
+- `AGENT_IMAGE` — checking-agent image name (default `dyano-checker-agent`)
+- `AGENT_MEDIA_VOLUME` — media volume name shared with the agent container
+- `AGENT_LLM_BASE_URL` / `AGENT_LLM_API_KEY` / `AGENT_LLM_MODEL` — the
+  OpenAI-compatible endpoint, key, and model the agent uses
 - Media files are stored under `media/` (`MEDIA_ROOT`)
 
 ## Deploying with Docker
@@ -139,6 +177,7 @@ and reads all values from environment variables (see `.env.example`).
 ### 3. Build and start
 
 ```bash
+docker compose build agent          # build the checking-agent image
 docker compose up -d --build
 ```
 
@@ -148,14 +187,20 @@ Then create the initial admin user:
 docker compose run --rm backend python manage.py createsuperuser
 ```
 
+> Note: the worker mounts `/var/run/docker.sock` so it can spawn agent
+> containers. This grants the worker the ability to create containers on the
+> Docker host — treat it as a privilege boundary and isolate the host Docker
+> daemon accordingly.
+
 ### 4. What runs where
 
 | Service   | Role                                | Port |
 | --------- | ----------------------------------- | ---- |
 | `web`     | nginx: frontend + reverse proxy     | 8080 |
 | `backend` | uvicorn (Django API / admin)        | 8000 |
-| `worker`  | FastStream Redis worker             | —    |
-| `redis`   | broker                              | —    |
+| `worker`  | FastStream Redis worker + agent orchestrator | — |
+| `agent`   | one-shot checking-agent image (built, not run by compose) | — |
+| `redis`   | broker                              | — |
 
 - Frontend: http://localhost:8080
 - Swagger: http://localhost:8000/api/docs

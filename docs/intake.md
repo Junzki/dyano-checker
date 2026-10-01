@@ -12,7 +12,8 @@ processed by an async worker.
 - **Django 5.2 + SQLite**, project under `backend/` (`config/` settings/urls,
   `checker/` app). `MEDIA_ROOT` points to `media/` at the repo root.
 - **Models** (`checker/models.py`):
-  - `RuleSet` — `name`, `yaml_file`, `schema` (JSONField), `created_at`
+  - `RuleSet` — `name`, `yaml_file`, `output_template` (optional output
+    spreadsheet template), `schema` (JSONField), `created_at`
   - `Submission` — FK to `RuleSet`, `status` (`queued → processing → completed/failed`)
   - `SubmissionFile` — FK to `Submission`, `category_name`, `requirement_name`,
     `key`, `file`, `original_name`; upload path `submissions/<id>/<key>/`
@@ -59,8 +60,10 @@ processed by an async worker.
 
 ## Key design decisions
 
-- **Async worker = status pipeline only** (`queued → processing → completed/failed`);
-  no rule-checking or template generation.
+- **Async worker = status pipeline** (`queued → processing → completed/failed`)
+  that spawns the one-shot checking agent (see `docs/agent-design.md`), which
+  extracts, sanitizes, checks each rule via the LLM, and fills the output
+  spreadsheet template.
 - **Only PDF** supported; every input uses `accept=".pdf,application/pdf"`.
 - **Django project in a separate top-level `backend/` dir** (not under `src/`).
 - **`keys_json` instead of `keys`**: a multipart field named `keys` collides with

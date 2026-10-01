@@ -37,6 +37,7 @@ export interface SubmissionDetail {
   id: number;
   status: string;
   files: SubmissionFile[];
+  output_url?: string | null;
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {

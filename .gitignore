@@ -8,6 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+agent/.venv
 
 # Django
 backend/db.sqlite3

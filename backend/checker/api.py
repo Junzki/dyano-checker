@@ -51,6 +51,7 @@ class SubmissionDetailOut(Schema):
     id: int
     status: str
     files: list[SubmissionFileOut]
+    output_url: str | None = None
 
 
 @api.get("/rulesets", response=list[RuleSetOut])
@@ -120,4 +121,5 @@ def get_submission(request: HttpRequest, submission_id: int):
             }
             for f in submission.files.all()
         ],
+        "output_url": submission.results.get("output_url"),
     }

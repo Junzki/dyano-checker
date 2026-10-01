@@ -22,12 +22,18 @@ by a FastStream/Redis worker.
 - `backend/` — Django project (`config/` = settings/urls, `checker/` = app).
   Not a package under `src/`; run via `uv run backend/manage.py`.
 - `backend/checker/`:
-  - `models.py` — `RuleSet`, `Submission`, `SubmissionFile`
+  - `models.py` — `RuleSet`, `RuleSkillFile`, `Submission`, `SubmissionFile`
   - `schema.py` — YAML → form schema parsing + requirement-key mapping
   - `api.py` — django-ninja API (`/api`, Swagger `/api/docs`)
   - `broker.py` — `RedisBroker` + `SubmissionMessage`
-  - `tasks.py` / `worker.py` — FastStream subscriber + status pipeline
+  - `tasks.py` / `worker.py` — FastStream subscriber + agent orchestration
   - `management/commands/runworker.py` — run the worker
+- `agent/` — one-shot LLM checking agent (Pydantic AI), Python 3.12, own image:
+  - `src/dyano_agent/` — `main.py`, `config.py`, `pdf_reader.py`,
+    `sanitizer.py`, `checker.py`, `schemas.py`, `report.py`
+  - `Dockerfile` — `python:3.12-slim`; deps resolved at build (no committed lock)
+- `skills/` — default `SKILL*.md` / `GATE*.md` / `output.template.xlsx`,
+  fallback for rule sets without uploaded `RuleSkillFile`s.
 - `web/` — React frontend (`src/api.ts`, `src/App.tsx`, `src/components/*`)
 
 ## Commands
@@ -46,6 +52,10 @@ uv run uvicorn config.asgi:application --app-dir backend --reload --port 8000
 cd web && npm install
 cd web && npm run build                   # tsc typecheck + vite build
 cd web && npm run dev                     # dev server (proxies /api, /media)
+
+# Checking agent (Python 3.12, own image)
+cd agent && uv sync                       # resolve agent deps (Python 3.12)
+docker build -t dyano-checker-agent agent # build the agent image
 ```
 
 There is no Python linter/test suite or npm test configured. For verification
@@ -77,6 +87,10 @@ flow below.
   recommended for the publish path.
 - Default `RedisBroker` is pub/sub (non-durable). If durable queues are needed,
   switch to `RedisStreamBroker`.
+- The worker spawns the checking agent via `docker run` and therefore needs the
+  Docker socket mounted and the `docker` CLI in its image (see
+  `docker-compose.yaml` and `backend/Dockerfile`). The agent image is built from
+  `agent/` (Python 3.12, not 3.14 — PaddleOCR has no 3.14 wheels).
 - `media/`, `backend/db.sqlite3`, `web/node_modules/`, `web/dist/` are gitignored.
 
 ## Smoke test
@@ -104,3 +118,8 @@ curl -s -X POST http://localhost:8000/api/submissions \
   -F 'keys_json=["0-0","1-0"]'
 curl -s http://localhost:8000/api/submissions/1   # status should reach "completed"
 ```
+
+The checking pipeline now runs the agent in Docker: the worker needs a working
+`docker` CLI, `/var/run/docker.sock`, the `dyano-checker-agent` image built, and
+`AGENT_LLM_API_KEY` (plus `AGENT_LLM_BASE_URL`/`AGENT_LLM_MODEL`) set, otherwise
+the submission ends in `failed` with the reason recorded in `Submission.results`.

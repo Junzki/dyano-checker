@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -86,3 +87,12 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = PROJECT_ROOT / "media"
 
 REDIS_URL = "redis://:password@localhost:6380/0"
+
+# Checking agent (one Docker container per submission). The worker builds an
+# input directory under MEDIA_ROOT/agent/<submission_id>/ and runs the agent
+# image, mounting the media volume so both sides see the same files.
+AGENT_IMAGE = os.environ.get("AGENT_IMAGE", "dyano-checker-agent")
+AGENT_MEDIA_VOLUME = os.environ.get("AGENT_MEDIA_VOLUME", "dyano-checker_media_data")
+AGENT_LLM_BASE_URL = os.environ.get("AGENT_LLM_BASE_URL", "")
+AGENT_LLM_API_KEY = os.environ.get("AGENT_LLM_API_KEY", "")
+AGENT_LLM_MODEL = os.environ.get("AGENT_LLM_MODEL", "gpt-4o-mini")

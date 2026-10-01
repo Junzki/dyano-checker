@@ -1,7 +1,7 @@
 import yaml
 from django.contrib import admin
 
-from .models import RuleSet, Submission, SubmissionFile
+from .models import RuleSet, RuleSkillFile, Submission, SubmissionFile
 from .schema import parse_ruleset
 
 
@@ -10,9 +10,15 @@ class SubmissionFileInline(admin.TabularInline):
     extra = 0
 
 
+class RuleSkillFileInline(admin.TabularInline):
+    model = RuleSkillFile
+    extra = 0
+
+
 @admin.register(RuleSet)
 class RuleSetAdmin(admin.ModelAdmin):
     list_display = ("name", "created_at")
+    inlines = [RuleSkillFileInline]
 
     def save_model(self, request, obj, form, change):
         uploaded = form.cleaned_data.get("yaml_file")
